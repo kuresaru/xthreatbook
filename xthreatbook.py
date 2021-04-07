@@ -2,6 +2,7 @@ from re import search
 import requests
 import sys
 import re
+import json
 from tokens import tokens
 
 itoken = 0
@@ -13,8 +14,8 @@ def check(session, ip):
     global itoken
     if len(tokens) == 0:
         return None, None, None  # 没有可用的key
-    key = tokens[itoken]
     itoken = (itoken + 1) % len(tokens)
+    key = tokens[itoken]
     data = {
         'apikey': key,
         'lang': 'zh',
@@ -22,9 +23,9 @@ def check(session, ip):
     }
     r = session.post(url, data).json()
     if r['response_code'] == 0:  # 数据正常
-        r = r['data']
-        for name in r:  # name是查询的ip 这个循环只有一次
-            info = r[name]
+        dr = r['data']
+        for name in dr:  # name是查询的ip 这个循环只有一次
+            info = dr[name]
             severity = info['severity']     # 危害程度  严重/高/中/低/无危胁
             judgmentsarr = info['judgments']   # 类型数组
             ibasic = info['basic']
@@ -40,8 +41,12 @@ def check(session, ip):
                 judgments = '%s%s/' % (judgments, j)
             return severity, locationname, judgments
     else:  # key失效 可能是次数用完了
-        tokens.remove(key)         # 删除失效key
-        return check(session, ip)  # 递归再查询
+        sys.stderr.write('\033[0;32;31m')
+        sys.stderr.write(r['verbose_msg'])  # 打印错误信息
+        sys.stderr.write(key)
+        sys.stderr.write('\033[m\n')
+        tokens.remove(key)               # 删除失效key
+        return check(session, ip)        # 递归再查询
 
 
 def run(filename):
@@ -57,13 +62,13 @@ def run(filename):
                 continue
             severity, locationname, judgments = check(session, line)
             if not severity:
-                sys.stderr.write('\033[0;32;31m查询失败: 没有可用的剩余次数\033[m')
+                sys.stderr.write('\033[0;32;31m查询失败: 没有可用的剩余次数\033[m\n')
                 break
             else:
                 print('%s,%s,%s,%s' % (
                     line, severity, locationname, judgments))
         session.close()
-        sys.stderr.write('\033[0;32;32m查询完成\033[m')
+        sys.stderr.write('\033[0;32;32m查询完成\033[m\n')
 
 
 if __name__ == '__main__':
