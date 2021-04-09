@@ -1,4 +1,5 @@
 /venv/
+/apikey.txt
 /tokens.py
 /test.txt
 __pycache__
